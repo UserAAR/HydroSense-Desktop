@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
-import { initDb, fetchWindow } from './db'
+import { initDb, fetchWindow, getRowCount, reseedDb } from './db'
 import { appendFileSync } from 'node:fs'
 
 app.disableHardwareAcceleration()
@@ -130,6 +130,15 @@ ipcMain.handle('dialog:save', async (_e, payload: { path?: string; text: string 
 
 ipcMain.handle('db:window', async (_e, seconds: number) => {
   return fetchWindow(seconds)
+})
+
+ipcMain.handle('db:diag', async () => {
+  return getRowCount()
+})
+
+ipcMain.handle('db:reseed', async () => {
+  reseedDb()
+  return getRowCount()
 })
 
 ipcMain.handle('ai:generate', async (_e, payload: { system: string; messages: { role: 'user'|'model'; content: string }[] }) => {

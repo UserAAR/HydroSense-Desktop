@@ -68,6 +68,7 @@
     "files": [
       "dist/main/**/*",
       "dist/renderer/**/*",
+      "node_modules/**/*",
       "package.json"
     ],
     "directories": {
@@ -76,8 +77,9 @@
     "extraMetadata": {
       "main": "dist/main/main.cjs"
     },
-    "extraResources": [
-      { "from": "build/icon.png", "to": "icon.png" }
+    "asarUnpack": [
+      "**/*.node",
+      "**/better-sqlite3/**"
     ],
     "compression": "maximum",
     "linux": {

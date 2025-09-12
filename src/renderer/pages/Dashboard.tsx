@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area } from 'recharts'
 import { useMockStore } from '../store/mock'
@@ -12,9 +12,7 @@ function downsample<T>(arr: T[], step: number) {
 }
 
 export default function Dashboard() {
-  const { latestWindow, summary, start, stop } = useMockStore()
-
-  useEffect(()=>{ start(); return () => stop() }, [start, stop])
+  const { latestWindow, summary } = useMockStore()
 
   const chartData = useMemo(() => {
     const base = latestWindow.map(d => ({
@@ -66,14 +64,15 @@ export default function Dashboard() {
               <LineChart data={chartData}>
                 <CartesianGrid stroke="#262b29" />
                 <XAxis dataKey="ts" hide />
-                <YAxis yAxisId="l" stroke="#6b7280" />
-                <YAxis yAxisId="r" orientation="right" stroke="#a78bfa" />
+                <YAxis yAxisId="l" stroke="#6b7280" domain={[0, 100]} ticks={[0,20,40,60,80,100]} allowDecimals={false} />
+                <YAxis yAxisId="r" orientation="right" stroke="#a78bfa" domain={[200, 1000]} ticks={[200,400,600,800,1000]} allowDecimals={false} />
+                <YAxis yAxisId="w" hide domain={[400, 700]} />
                 <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #1f2937' }} />
                 <Legend wrapperStyle={{ color: '#9ca3af' }} verticalAlign="top" height={20} />
                 <Line yAxisId="r" type="monotone" dataKey="rpm" stroke="#a78bfa" dot={false} strokeWidth={2} isAnimationActive={false} />
                 <Line yAxisId="l" type="monotone" dataKey="vibration_piezo" stroke="#22c55e" dot={false} strokeWidth={2} isAnimationActive={false} />
                 <Line yAxisId="l" type="monotone" dataKey="vibration_sw420" stroke="#10b981" dot={false} strokeWidth={2} isAnimationActive={false} />
-                <Line yAxisId="l" type="monotone" dataKey="weight" stroke="#60a5fa" dot={false} strokeWidth={2} isAnimationActive={false} />
+                <Line yAxisId="w" type="monotone" dataKey="weight" stroke="#60a5fa" dot={false} strokeWidth={2} isAnimationActive={false} />
                 <Line yAxisId="l" type="monotone" dataKey="speed" stroke="#06b6d4" dot={false} strokeWidth={2} isAnimationActive={false} />
                 <Line yAxisId="l" type="monotone" dataKey="acceleration" stroke="#f472b6" dot={false} strokeWidth={2} isAnimationActive={false} />
                 <Line yAxisId="l" type="monotone" dataKey="temperature" stroke="#f59e0b" dot={false} strokeWidth={2} isAnimationActive={false} />

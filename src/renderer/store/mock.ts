@@ -34,21 +34,30 @@ type State = {
   latestWindow: Sample[]
   summary: Summary
   intervalMs: number
+  running: boolean
   start: () => void
   stop: () => void
   setIntervalMs: (ms: number) => void
 }
 
 let timer: any = null
+const PULSE_SECONDS = 8
+let pulseUntilTs = 0
+let stopping = false
 
 function computeStatus(s: Omit<Sample, 'status'>): 'ok' | 'warn' | 'alert' {
-  if (s.vibration_piezo > 0.8 || s.temperature > 80 || s.water_pressure > 3) return 'alert'
-  if (s.vibration_piezo > 0.6) return 'warn'
+  // vibration thresholds aligned with 1-4 normal, >5 problematic
+  if (s.vibration_piezo > 5 || s.vibration_sw420 > 5) return 'alert'
+  if (s.vibration_piezo > 4 || s.vibration_sw420 > 4) return 'warn'
+
+  // water pressure: wide range up to 100 bar; alert on extreme
+  if (s.water_pressure < 1 || s.water_pressure > 95) return 'warn'
+
   return 'ok'
 }
 
 function computeSummary(window: Sample[]): Summary {
-  const mean = (fn: (s: Sample) => number) => Number((window.reduce((a, b) => a + fn(b), 0) / window.length).toFixed(2))
+  const mean = (fn: (s: Sample) => number) => Number((window.reduce((a, b) => a + fn(b), 0) / Math.max(window.length, 1)).toFixed(2))
   return {
     rpm: Math.round(mean(s => s.rpm)),
     vibration_piezo: mean(s => s.vibration_piezo),
@@ -63,23 +72,32 @@ function computeSummary(window: Sample[]): Summary {
   }
 }
 
-function seed(): Sample[] {
-  const now = Date.now()
-  return Array.from({ length: 300 }, (_, i) => ({
+function zeroSample(ts: number): Sample {
+  return {
     id: 'B01',
-    ts: now - (300 - i) * 1000,
-    rpm: 1100,
-    vibration_piezo: 0.4,
-    vibration_sw420: 0.3,
-    weight: 12,
-    speed: 6,
-    acceleration: 0.9,
-    temperature: 34,
-    water_pressure: 2.1,
-    water_speed: 1.8,
-    water_temperature: 22,
+    ts,
+    rpm: 0,
+    vibration_piezo: 0,
+    vibration_sw420: 0,
+    weight: 0,
+    speed: 0,
+    acceleration: 0,
+    temperature: 0,
+    water_pressure: 0,
+    water_speed: 0,
+    water_temperature: 0,
     status: 'ok'
-  }))
+  }
+}
+
+function zeroWindow(count = 300): Sample[] {
+  const now = Date.now()
+  return Array.from({ length: count }, (_, i) => zeroSample(now - (count - i) * 1000))
+}
+
+function seed(): Sample[] {
+  // Zero-state until user presses Start
+  return zeroWindow(300)
 }
 
 export const useMockStore = create<State>((set, get) => {
@@ -90,20 +108,61 @@ export const useMockStore = create<State>((set, get) => {
     latestWindow,
     summary: computeSummary(latestWindow),
     intervalMs: 1000,
+    running: false,
     start: () => {
       if (timer) return
+      pulseUntilTs = Date.now() + PULSE_SECONDS * 1000
+      stopping = false
+      set({ running: true })
       timer = setInterval(async () => {
         const rows = await window.api.fetchWindow(300)
-        const withStatus: Sample[] = rows.map((r: any) => ({ ...r, status: computeStatus(r) }))
+        const now = Date.now()
+        const pulseStartTs = pulseUntilTs - PULSE_SECONDS * 1000
+        const withStatus: Sample[] = rows.map((r: any) => {
+          // Apply start/stop acceleration pulse over the last PULSE_SECONDS window
+          let acceleration = r.acceleration
+          if (now <= pulseUntilTs && r.ts >= pulseStartTs && r.ts <= pulseUntilTs) {
+            const t = (r.ts - pulseStartTs) / (PULSE_SECONDS * 1000) // 0..1
+            const tri = 1 - Math.abs(2 * t - 1) // triangle 0..1..0
+            acceleration = 2 + tri * (10 - 2)
+          }
+          const sample = {
+            id: 'B01',
+            ts: r.ts,
+            rpm: r.rpm,
+            vibration_piezo: r.vibration_piezo,
+            vibration_sw420: r.vibration_sw420,
+            weight: r.weight,
+            speed: r.speed,
+            acceleration,
+            temperature: r.temperature,
+            water_pressure: r.water_pressure,
+            water_speed: r.water_speed,
+            water_temperature: r.water_temperature
+          }
+          return { ...sample, status: computeStatus(sample) }
+        })
         const st = get()
         set({ data: withStatus, latestWindow: withStatus.slice(-300), summary: computeSummary(withStatus.slice(-300)) })
+
+        // finalize stop after pulse
+        if (stopping && now >= pulseUntilTs) {
+          if (timer) {
+            clearInterval(timer)
+            timer = null
+          }
+          stopping = false
+          set({ running: false })
+          const zeros = zeroWindow(300)
+          set({ data: zeros, latestWindow: zeros, summary: computeSummary(zeros) })
+        }
       }, get().intervalMs)
     },
     stop: () => {
-      if (timer) {
-        clearInterval(timer)
-        timer = null
-      }
+      if (!timer) return
+      // Trigger stop pulse window, then transition to zero-state
+      pulseUntilTs = Date.now() + PULSE_SECONDS * 1000
+      stopping = true
     },
     setIntervalMs: (ms: number) => {
       set({ intervalMs: ms })

@@ -1,8 +1,9 @@
 import { memo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Activity, BarChart2, Brain, MessageSquare, Bell, FileText, Settings, Info, Import, Download, CheckCircle2 } from 'lucide-react'
+import { Activity, BarChart2, Brain, MessageSquare, Bell, FileText, Settings, Info, Import, Download, CheckCircle2, Play, Square } from 'lucide-react'
 import logo from '../assets/logo.svg'
 import ExportDialog from './ExportDialog'
+import { useMockStore } from '../store/mock'
 
 type Props = { theme: 'dark'|'light'; setTheme: (t: 'dark'|'light') => void }
 
@@ -21,6 +22,7 @@ const nav = [
 function SidebarImpl({ theme, setTheme }: Props) {
   const [exportOpen, setExportOpen] = useState(false)
   const [toast, setToast] = useState<string>('')
+  const { running, start, stop } = useMockStore()
 
   async function onImport() {
     const res = await window.api.openFile()
@@ -35,7 +37,16 @@ function SidebarImpl({ theme, setTheme }: Props) {
       <aside className="h-full w-[260px] border-r border-neutral-800 bg-neutral-900/60 backdrop-blur">
         <div className="h-16 flex items-center gap-3 px-4">
           <img src={logo} alt="HydroSense" className="w-9 h-9 rounded-md shadow-sm ring-1 ring-emerald-500/20" draggable={false} />
-          <div className="text-[18px] font-semibold whitespace-nowrap">HydroSense</div>
+          <div className="text-[18px] font-semibold whitespace-nowrap flex-1">HydroSense</div>
+          {!running ? (
+            <button onClick={start} className="inline-flex items-center gap-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white h-8 px-3 text-[12px]">
+              <Play className="w-3.5 h-3.5" /> Start
+            </button>
+          ) : (
+            <button onClick={stop} className="inline-flex items-center gap-1 rounded-md bg-red-600 hover:bg-red-500 text-white h-8 px-3 text-[12px]">
+              <Square className="w-3.5 h-3.5" /> Stop
+            </button>
+          )}
         </div>
         <nav className="px-2 space-y-1">
           {nav.map(i => {
