@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark light;
+}
+
+html.dark {
+  background-color: #0b1311;
+}
+
+body, #root {
+  height: 100vh;
+}
+
+body {
+  font-size: 15px;
+} 
